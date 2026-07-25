@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>کهکشان</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000005;
+            touch-action: none;
+        }
+
+        /* ===== مستطیل سفید پایین سمت چپ ===== */
+        .white-rectangle {
+            position: fixed;
+            bottom: 0px;      /* فاصله از پایین صفحه */
+            left: 0px;        /* فاصله از چپ صفحه */
+            width: 125px;       /* 🔹 طول مستطیل رو اینجا تغییر بده */
+            height: 40px;      /* 🔹 عرض مستطیل رو اینجا تغییر بده */
+            background-color: #ffffff;
+            border-radius: 5px; /* گوشه‌های گرد (اختیاری) */
+            box-shadow: 0 0 15px rgba(255,255,255,0.3); /* درخشش ملایم */
+            z-index: 10;       /* همیشه روی کهکشان باشه */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== خود مستطیل سفید ===== -->
+    <div class="white-rectangle"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.163.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000008);
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(8, 4.5, 12);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
+        document.body.appendChild(renderer.domElement);
+
+        // ---------- پارامترهای کهکشان متعادل ----------
+        const starCount = 15000;
+        const armCount = 3;
+        const maxRadius = 10.5;
+        const coreRadius = 1.8;
+
+        const positions = new Float32Array(starCount * 3);
+        const colors = new Float32Array(starCount * 3);
+        const sizes = new Float32Array(starCount);
+
+        const coreColor = new THREE.Color(0xffdd88);
+        const armColor1 = new THREE.Color(0x88aaff);
+        const armColor2 = new THREE.Color(0xff88bb);
+
+        function noise(x, y) {
+            return Math.sin(x * 1.2 + y * 2.7) * Math.cos(y * 1.8 - x * 1.3);
+        }
+
+        const clusters = [];
+        const clusterCount = 25;
+        for (let i = 0; i < clusterCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const r = coreRadius + 1.5 + Math.random() * (maxRadius - coreRadius - 1.5);
+            clusters.push({
+                x: Math.cos(angle) * r,
+                z: Math.sin(angle) * r,
+                y: (Math.random() - 0.5) * 1.2,
+                radius: 0.3 + Math.random() * 0.6,
+                count: Math.floor(15 + Math.random() * 50)
+            });
+        }
+
+        let starIndex = 0;
+        const clusterStars = Math.floor(starCount * 0.25);
+        for (let i = 0; i < clusterStars && starIndex < starCount; i++) {
+            const cluster = clusters[Math.floor(Math.random() * clusters.length)];
+            const theta = Math.random() * Math.PI * 2;
+            const rOffset = Math.random() * cluster.radius;
+            const yOffset = (Math.random() - 0.5) * cluster.radius * 0.5;
+            const x = cluster.x + Math.cos(theta) * rOffset;
+            const z = cluster.z + Math.sin(theta) * rOffset;
+            const y = cluster.y + yOffset;
+            positions[starIndex * 3] = x;
+            positions[starIndex * 3 + 1] = y;
+            positions[starIndex * 3 + 2] = z;
+            const col = coreColor.clone().lerp(armColor1, Math.random() * 0.5);
+            col.multiplyScalar(0.7 + Math.random() * 0.4);
+            colors[starIndex * 3] = col.r;
+            colors[starIndex * 3 + 1] = col.g;
+            colors[starIndex * 3 + 2] = col.b;
+            sizes[starIndex] = 0.03 + Math.random() * 0.07;
+            starIndex++;
+        }
+
+        for (let i = starIndex; i < starCount; i++) {
+            const isArm = Math.random() < 0.8;
+            let r, angle, y;
+            if (isArm) {
+                const armIndex = Math.floor(Math.random() * armCount);
+                const armAngleOffset = (armIndex / armCount) * Math.PI * 2;
+                const distFactor = Math.pow(Math.random(), 0.7);
+                r = coreRadius + distFactor * (maxRadius - coreRadius);
+                const spiralAngle = distFactor * 13 + armAngleOffset;
+                const noiseAngle = noise(r * 0.4, distFactor * 4) * 0.35;
+                const randomOffset = (Math.random() - 0.5) * (0.4 + distFactor * 0.5);
+                angle = spiralAngle + randomOffset + noiseAngle;
+                const thicknessNoise = noise(r * 0.5, angle * 0.3) * 0.4;
+                const baseThickness = 0.4 + distFactor * 0.5;
+                y = (Math.random() - 0.5) * baseThickness * 1.2 + thicknessNoise * 0.3;
+            } else {
+                r = coreRadius + Math.random() * maxRadius * 1.1;
+                angle = Math.random() * Math.PI * 2 + Math.sin(r * 0.2) * 0.3;
+                y = (Math.random() - 0.5) * 2.0 * (1 + Math.sin(r * 0.3) * 0.2);
+            }
+            const x = Math.cos(angle) * r;
+            const z = Math.sin(angle) * r;
+            positions[i * 3] = x;
+            positions[i * 3 + 1] = y;
+            positions[i * 3 + 2] = z;
+            const dist = Math.sqrt(x * x + y * y + z * z);
+            const normDist = Math.min(dist / maxRadius, 1);
+            let color;
+            if (dist < coreRadius) {
+                color = coreColor.clone().lerp(new THREE.Color(0xffaa55), Math.random() * 0.5);
+                color.multiplyScalar(0.8 + Math.random() * 0.3);
+            } else {
+                const mix1 = Math.sin(angle * 1.3 + dist * 0.3) * 0.5 + 0.5;
+                color = armColor1.clone().lerp(armColor2, mix1);
+                const fade = 1 - Math.pow(normDist, 1.8) * 0.35;
+                color.multiplyScalar(fade * (0.7 + Math.random() * 0.3));
+                color.r += (Math.random() - 0.5) * 0.15;
+                color.g += (Math.random() - 0.5) * 0.15;
+                color.b += (Math.random() - 0.5) * 0.15;
+            }
+            colors[i * 3] = Math.max(0.05, Math.min(1, color.r));
+            colors[i * 3 + 1] = Math.max(0.05, Math.min(1, color.g));
+            colors[i * 3 + 2] = Math.max(0.05, Math.min(1, color.b));
+            sizes[i] = 0.02 + Math.random() * 0.07 * (1 + 1.2 * Math.max(0, 1 - dist / 3.5));
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+        gradient.addColorStop(0, 'rgba(255,255,255,1)');
+        gradient.addColorStop(0.2, 'rgba(255,255,255,0.9)');
+        gradient.addColorStop(0.6, 'rgba(255,255,255,0.4)');
+        gradient.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 64, 64);
+        const particleTexture = new THREE.CanvasTexture(canvas);
+
+        const material = new THREE.PointsMaterial({
+            size: 0.13,
+            map: particleTexture,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.92,
+            sizeAttenuation: true,
+        });
+
+        const galaxy = new THREE.Points(geometry, material);
+        scene.add(galaxy);
+
+        const dustCount = 3000;
+        const dustPos = new Float32Array(dustCount * 3);
+        const dustCol = new Float32Array(dustCount * 3);
+        for (let i = 0; i < dustCount; i++) {
+            const r = 2 + Math.random() * 9;
+            const angle = Math.random() * Math.PI * 2 + Math.sin(r * 0.15) * 0.3;
+            const y = (Math.random() - 0.5) * 2.2 + Math.sin(r * 0.3) * 0.3;
+            dustPos[i * 3] = Math.cos(angle) * r;
+            dustPos[i * 3 + 1] = y;
+            dustPos[i * 3 + 2] = Math.sin(angle) * r;
+            const c = new THREE.Color(0x8866bb).lerp(new THREE.Color(0x4488cc), Math.random() * 0.6);
+            dustCol[i * 3] = c.r * 0.25;
+            dustCol[i * 3 + 1] = c.g * 0.25;
+            dustCol[i * 3 + 2] = c.b * 0.25;
+        }
+        const dustGeo = new THREE.BufferGeometry();
+        dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+        dustGeo.setAttribute('color', new THREE.BufferAttribute(dustCol, 3));
+        const dustMat = new THREE.PointsMaterial({
+            size: 0.5,
+            map: particleTexture,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.1,
+            sizeAttenuation: true,
+        });
+        const dustLayer = new THREE.Points(dustGeo, dustMat);
+        scene.add(dustLayer);
+
+        const bgCount = 2500;
+        const bgPos = new Float32Array(bgCount * 3);
+        for (let i = 0; i < bgCount; i++) {
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const r = 70 + Math.random() * 130;
+            bgPos[i * 3] = Math.sin(phi) * Math.cos(theta) * r;
+            bgPos[i * 3 + 1] = Math.sin(phi) * Math.sin(theta) * r * 0.5;
+            bgPos[i * 3 + 2] = Math.cos(phi) * r;
+        }
+        const bgGeo = new THREE.BufferGeometry();
+        bgGeo.setAttribute('position', new THREE.BufferAttribute(bgPos, 3));
+        const bgMat = new THREE.PointsMaterial({
+            color: 0x99aadd,
+            size: 0.15,
+            transparent: true,
+            opacity: 0.6,
+            blending: THREE.AdditiveBlending,
+            sizeAttenuation: true,
+        });
+        const bgStars = new THREE.Points(bgGeo, bgMat);
+        scene.add(bgStars);
+
+        let targetRotX = 0,
+            targetRotY = 0;
+        let currentRotX = 0,
+            currentRotY = 0;
+
+        window.addEventListener('deviceorientation', (e) => {
+            const beta = e.beta || 0;
+            const gamma = e.gamma || 0;
+            targetRotX = (beta / 180) * Math.PI * 0.7;
+            targetRotY = (gamma / 90) * Math.PI * 0.7;
+        }, { passive: true });
+
+        let time = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.0015;
+            currentRotX += (targetRotX - currentRotX) * 0.05;
+            currentRotY += (targetRotY - currentRotY) * 0.05;
+            const autoRotate = 0.0006;
+            galaxy.rotation.x = currentRotX;
+            galaxy.rotation.y = currentRotY + time * autoRotate;
+            dustLayer.rotation.x = currentRotX;
+            dustLayer.rotation.y = currentRotY + time * autoRotate * 0.85;
+            bgStars.rotation.y += 0.00004;
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        let isDragging = false;
+        let prevX = 0,
+            prevY = 0;
+        const onPointerDown = (e) => {
+            const clientX = e.clientX || e.touches?.[0]?.clientX || 0;
+            const clientY = e.clientY || e.touches?.[0]?.clientY || 0;
+            isDragging = true;
+            prevX = clientX;
+            prevY = clientY;
+        };
+        const onPointerMove = (e) => {
+            if (!isDragging) return;
+            const clientX = e.clientX || e.touches?.[0]?.clientX || 0;
+            const clientY = e.clientY || e.touches?.[0]?.clientY || 0;
+            const dx = clientX - prevX;
+            const dy = clientY - prevY;
+            targetRotY += dx * 0.004;
+            targetRotX += dy * 0.004;
+            prevX = clientX;
+            prevY = clientY;
+        };
+        const onPointerUp = () => { isDragging = false; };
+        renderer.domElement.addEventListener('mousedown', onPointerDown);
+        window.addEventListener('mousemove', onPointerMove);
+        window.addEventListener('mouseup', onPointerUp);
+        renderer.domElement.addEventListener('touchstart', onPointerDown, { passive: true });
+        renderer.domElement.addEventListener('touchmove', onPointerMove, { passive: true });
+        renderer.domElement.addEventListener('touchend', onPointerUp, { passive: true });
+    </script>
+</body>
+</html>
